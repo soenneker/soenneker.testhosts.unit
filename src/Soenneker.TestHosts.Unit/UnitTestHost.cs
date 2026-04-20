@@ -1,6 +1,3 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Bogus;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -8,130 +5,92 @@ using Serilog;
 using Serilog.Core;
 using Serilog.Extensions.Logging;
 using Soenneker.Atomics.ValueBools;
-using Soenneker.Serilog.Sinks.TUnit;
 using Soenneker.TestHosts.Unit.Abstract;
 using Soenneker.Utils.AutoBogus;
 using Soenneker.Utils.AutoBogus.Config;
+using System;
+using System.Threading.Tasks;
 
 namespace Soenneker.TestHosts.Unit;
 
-///<inheritdoc cref="IUnitTestHost"/>
 public class UnitTestHost : IUnitTestHost
 {
     private ServiceProvider? _serviceProvider;
     private ILoggerFactory? _loggerFactory;
     private SerilogLoggerProvider? _serilogProvider;
     private Logger? _serilogLogger;
-    private TUnitTestContextSink? _tUnitSink;
+
+    private readonly object _buildLock = new();
+
+    private ValueAtomicBool _disposed;
+    private bool _built;
 
     private readonly Lazy<AutoFaker> _autoFaker;
     private readonly Lazy<Faker> _faker;
 
-    private ValueAtomicBool _disposed;
-
     public IServiceCollection Services { get; } = new ServiceCollection();
 
-    public IServiceProvider ServicesProvider =>
-        _serviceProvider ?? throw new InvalidOperationException("TestHost has not been initialized. Call Initialize() first.");
+    public IServiceProvider ServicesProvider
+    {
+        get
+        {
+            EnsureBuilt();
+            return _serviceProvider!;
+        }
+    }
 
-    public bool IsInitialized { get; private set; }
-
-    /// <summary>
-    /// Provides access to AutoFaker (lazy).
-    /// </summary>
-    public AutoFaker AutoFaker => _autoFaker.Value;
-
-    /// <summary>
-    /// Provides access to Faker (lazy).
-    /// </summary>
     public Faker Faker => _faker.Value;
+
+    public AutoFaker AutoFaker => _autoFaker.Value;
 
     public UnitTestHost()
     {
-        _autoFaker = new Lazy<AutoFaker>(() => new AutoFaker(), LazyThreadSafetyMode.ExecutionAndPublication);
-        _faker = new Lazy<Faker>(() => _autoFaker.Value.Faker, LazyThreadSafetyMode.ExecutionAndPublication);
+        _faker = new Lazy<Faker>(() => new Faker(), true);
+        _autoFaker = new Lazy<AutoFaker>(() =>
+        {
+            var config = new AutoFakerConfig();
+            return new AutoFaker(config);
+        }, true);
     }
 
-    public UnitTestHost(AutoFakerConfig? autoFakerConfig = null)
-    {
-        _autoFaker = new Lazy<AutoFaker>(() => new AutoFaker(autoFakerConfig), LazyThreadSafetyMode.ExecutionAndPublication);
-        _faker = new Lazy<Faker>(() => _autoFaker.Value.Faker, LazyThreadSafetyMode.ExecutionAndPublication);
-    }
-
-    /// <summary>
-    /// Configure Serilog for this host. Optional.
-    /// </summary>
-    public UnitTestHost UseSerilog(Action<LoggerConfiguration>? configure = null)
-    {
-        _tUnitSink = new TUnitTestContextSink();
-
-        LoggerConfiguration config = new LoggerConfiguration().MinimumLevel.Verbose().Enrich.FromLogContext().WriteTo.Sink(_tUnitSink);
-
-        configure?.Invoke(config);
-
-        _serilogLogger = config.CreateLogger();
-        _serilogProvider = new SerilogLoggerProvider(_serilogLogger, dispose: false);
-
-        return this;
-    }
-
-    /// <summary>
-    /// Build the service provider and finalize the host.
-    /// </summary>
     public virtual ValueTask Initialize()
     {
-        if (IsInitialized)
-            throw new InvalidOperationException("TestHost is already initialized.");
-
-        if (_serilogProvider != null)
-        {
-            _loggerFactory = LoggerFactory.Create(builder =>
-            {
-                builder.ClearProviders();
-                builder.AddProvider(_serilogProvider);
-            });
-
-            Services.AddSingleton(_loggerFactory);
-            Services.AddSingleton(typeof(ILogger<>), typeof(Logger<>));
-        }
-
-        _serviceProvider = Services.BuildServiceProvider();
-        IsInitialized = true;
-
+        EnsureBuilt();
         return ValueTask.CompletedTask;
     }
 
-    public T GetRequiredService<T>() where T : notnull
+    public void Build()
     {
-        return ServicesProvider.GetRequiredService<T>();
+        EnsureBuilt();
     }
 
-    public object GetRequiredService(Type type)
+    private void EnsureBuilt()
     {
-        return ServicesProvider.GetRequiredService(type);
+        if (_built)
+            return;
+
+        lock (_buildLock)
+        {
+            if (_built)
+                return;
+
+            _serviceProvider = Services.BuildServiceProvider(validateScopes: true);
+            _built = true;
+        }
     }
 
-    public async ValueTask DisposeAsync()
+    public virtual async ValueTask DisposeAsync()
     {
-        if (!_disposed.TrySetTrue())
+        if (_disposed.TrySetTrue())
             return;
 
         if (_serviceProvider is IAsyncDisposable asyncDisposable)
-            await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+            await asyncDisposable.DisposeAsync();
         else
             _serviceProvider?.Dispose();
 
+        _serilogProvider?.Dispose();
         _loggerFactory?.Dispose();
-
-        if (_serilogProvider is not null)
-            await _serilogProvider.DisposeAsync().ConfigureAwait(false);
-
-        if (_serilogLogger is not null)
-            await _serilogLogger.DisposeAsync().ConfigureAwait(false);
-
-        if (_tUnitSink is not null)
-            await _tUnitSink.DisposeAsync().ConfigureAwait(false);
-
-        Log.Logger = Logger.None;
+        _serilogLogger?.Dispose();
     }
 }
