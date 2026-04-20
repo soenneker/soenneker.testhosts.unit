@@ -46,6 +46,12 @@ public class UnitTestHost : IUnitTestHost
     /// </summary>
     public Faker Faker => _faker.Value;
 
+    public UnitTestHost()
+    {
+        _autoFaker = new Lazy<AutoFaker>(() => new AutoFaker(), LazyThreadSafetyMode.ExecutionAndPublication);
+        _faker = new Lazy<Faker>(() => _autoFaker.Value.Faker, LazyThreadSafetyMode.ExecutionAndPublication);
+    }
+
     public UnitTestHost(AutoFakerConfig? autoFakerConfig = null)
     {
         _autoFaker = new Lazy<AutoFaker>(() => new AutoFaker(autoFakerConfig), LazyThreadSafetyMode.ExecutionAndPublication);
