@@ -72,7 +72,7 @@ public class UnitTestHost : IUnitTestHost
     /// <summary>
     /// Build the service provider and finalize the host.
     /// </summary>
-    public ValueTask Initialize()
+    public virtual ValueTask Initialize()
     {
         if (IsInitialized)
             throw new InvalidOperationException("TestHost is already initialized.");
