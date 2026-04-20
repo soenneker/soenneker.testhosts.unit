@@ -17,7 +17,7 @@ public sealed class UnitTestHostTests
     {
         await using var host = new UnitTestHost();
 
-        await host.Initialize();
+        await host.InitializeAsync();
 
         ILogger<UnitTestHostTests> logger = host.ServicesProvider.GetRequiredService<ILogger<UnitTestHostTests>>();
 
@@ -31,7 +31,7 @@ public sealed class UnitTestHostTests
 
         host.Services.AddLogging(builder => builder.AddSerilog(dispose: false));
 
-        await host.Initialize();
+        await host.InitializeAsync();
 
         ILogger<UnitTestHostTests> logger = host.ServicesProvider.GetRequiredService<ILogger<UnitTestHostTests>>();
 
@@ -45,9 +45,9 @@ public sealed class UnitTestHostTests
     {
         await using var host = new UnitTestHost();
 
-        await host.Initialize();
+        await host.InitializeAsync();
 
-        await host.Initialize();
+        await host.InitializeAsync();
 
         ILogger<UnitTestHostTests> logger = host.ServicesProvider.GetRequiredService<ILogger<UnitTestHostTests>>();
 
