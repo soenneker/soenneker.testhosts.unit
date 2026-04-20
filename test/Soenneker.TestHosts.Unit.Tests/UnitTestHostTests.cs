@@ -39,4 +39,18 @@ public sealed class UnitTestHostTests
 
         await Assert.That(logger).IsNotNull();
     }
+
+    [Test]
+    public async Task Initialize_is_safe_to_call_multiple_times()
+    {
+        await using var host = new UnitTestHost();
+
+        await host.Initialize();
+
+        await host.Initialize();
+
+        ILogger<UnitTestHostTests> logger = host.ServicesProvider.GetRequiredService<ILogger<UnitTestHostTests>>();
+
+        await Assert.That(logger).IsNotNull();
+    }
 }

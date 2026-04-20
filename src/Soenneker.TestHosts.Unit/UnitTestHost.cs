@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Serilog;
 using Serilog.Core;
 using Serilog.Extensions.Logging;
+using Soenneker.Asyncs.Initializers;
 using Soenneker.Atomics.ValueBools;
 using Soenneker.Serilog.Sinks.TUnit;
 using Soenneker.TestHosts.Unit.Abstract;
@@ -11,10 +12,13 @@ using Soenneker.Utils.AutoBogus;
 using Soenneker.Utils.AutoBogus.Config;
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using Soenneker.Extensions.ValueTask;
 
 namespace Soenneker.TestHosts.Unit;
 
+///<inheritdoc cref="IUnitTestHost"/>
 public class UnitTestHost : IUnitTestHost
 {
     private ServiceProvider? _serviceProvider;
@@ -23,24 +27,16 @@ public class UnitTestHost : IUnitTestHost
     private Logger? _serilogLogger;
     private TUnitTestContextSink? _tUnitSink;
 
-    private readonly object _buildLock = new();
-
     private ValueAtomicBool _disposed;
-    private bool _built;
+    private readonly AsyncInitializer _initializer;
 
     private readonly Lazy<AutoFaker> _autoFaker;
     private readonly Lazy<Faker> _faker;
 
     public IServiceCollection Services { get; } = new ServiceCollection();
 
-    public IServiceProvider ServicesProvider
-    {
-        get
-        {
-            EnsureBuilt();
-            return _serviceProvider!;
-        }
-    }
+    public IServiceProvider ServicesProvider =>
+        _serviceProvider ?? throw new InvalidOperationException("Host has not been initialized. Call Initialize() first.");
 
     public Faker Faker => _faker.Value;
 
@@ -54,34 +50,20 @@ public class UnitTestHost : IUnitTestHost
             var config = new AutoFakerConfig();
             return new AutoFaker(config);
         }, true);
+
+        _initializer = new AsyncInitializer(BuildServices);
     }
 
-    public virtual ValueTask Initialize()
+    public virtual ValueTask Initialize(CancellationToken cancellationToken = default)
     {
-        EnsureBuilt();
+        return _initializer.Init(cancellationToken);
+    }
+
+    private ValueTask BuildServices()
+    {
+        EnsureLoggingConfigured();
+        _serviceProvider = Services.BuildServiceProvider(validateScopes: true);
         return ValueTask.CompletedTask;
-    }
-
-    public void Build()
-    {
-        EnsureBuilt();
-    }
-
-    private void EnsureBuilt()
-    {
-        if (_built)
-            return;
-
-        lock (_buildLock)
-        {
-            if (_built)
-                return;
-
-            EnsureLoggingConfigured();
-
-            _serviceProvider = Services.BuildServiceProvider(validateScopes: true);
-            _built = true;
-        }
     }
 
     private void EnsureLoggingConfigured()
@@ -90,11 +72,7 @@ public class UnitTestHost : IUnitTestHost
         {
             _tUnitSink = new TUnitTestContextSink();
 
-            _serilogLogger = new LoggerConfiguration()
-                             .MinimumLevel.Verbose()
-                             .Enrich.FromLogContext()
-                             .WriteTo.Sink(_tUnitSink)
-                             .CreateLogger();
+            _serilogLogger = new LoggerConfiguration().MinimumLevel.Verbose().Enrich.FromLogContext().WriteTo.Sink(_tUnitSink).CreateLogger();
 
             _serilogProvider = new SerilogLoggerProvider(_serilogLogger, dispose: false);
             _loggerFactory = LoggerFactory.Create(builder => builder.AddProvider(_serilogProvider));
@@ -102,27 +80,38 @@ public class UnitTestHost : IUnitTestHost
 
         Log.Logger = _serilogLogger;
 
-        if (!Services.Any(descriptor => descriptor.ServiceType == typeof(ILoggerFactory)))
+        if (Services.All(descriptor => descriptor.ServiceType != typeof(ILoggerFactory)))
             Services.AddSingleton(_loggerFactory!);
 
-        if (!Services.Any(descriptor => descriptor.ServiceType == typeof(ILogger<>)))
+        if (Services.All(descriptor => descriptor.ServiceType != typeof(ILogger<>)))
             Services.AddSingleton(typeof(ILogger<>), typeof(Logger<>));
     }
 
     public virtual async ValueTask DisposeAsync()
     {
-        if (_disposed.TrySetTrue())
+        if (!_disposed.TrySetTrue())
             return;
 
         if (_serviceProvider is IAsyncDisposable asyncDisposable)
-            await asyncDisposable.DisposeAsync();
+            await asyncDisposable.DisposeAsync().NoSync();
         else
-            _serviceProvider?.Dispose();
+        {
+            if (_serviceProvider != null)
+                await _serviceProvider.DisposeAsync().NoSync();
+        }
 
-        _serilogProvider?.Dispose();
+        if (_serilogProvider is not null)
+            await _serilogProvider.DisposeAsync().NoSync();
+
         _loggerFactory?.Dispose();
-        _serilogLogger?.Dispose();
-        _tUnitSink?.Dispose();
+
+        if (_serilogLogger is not null)
+            await _serilogLogger.DisposeAsync().NoSync();
+
+        if (_tUnitSink is not null)
+            await _tUnitSink.DisposeAsync().NoSync();
+
+        await _initializer.DisposeAsync().NoSync();
 
         Log.Logger = Logger.None;
     }
