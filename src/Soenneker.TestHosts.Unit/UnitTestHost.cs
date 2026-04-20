@@ -12,7 +12,6 @@ using Soenneker.Utils.AutoBogus;
 using Soenneker.Utils.AutoBogus.Config;
 using System;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Soenneker.Extensions.ValueTask;
 
@@ -54,9 +53,9 @@ public class UnitTestHost : IUnitTestHost
         _initializer = new AsyncInitializer(BuildServices);
     }
 
-    public virtual ValueTask Initialize(CancellationToken cancellationToken = default)
+    public async Task InitializeAsync()
     {
-        return _initializer.Init(cancellationToken);
+        await _initializer.Init().NoSync();
     }
 
     private ValueTask BuildServices()
