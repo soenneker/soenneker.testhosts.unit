@@ -53,7 +53,7 @@ public class UnitTestHost : IUnitTestHost
         _initializer = new AsyncInitializer(BuildServices);
     }
 
-    public async Task InitializeAsync()
+    public virtual async Task InitializeAsync()
     {
         await _initializer.Init().NoSync();
     }
