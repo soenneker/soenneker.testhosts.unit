@@ -32,13 +32,25 @@ public class UnitTestHost : IUnitTestHost
     private readonly Lazy<AutoFaker> _autoFaker;
     private readonly Lazy<Faker> _faker;
 
+    /// <summary>
+    /// Gets services.
+    /// </summary>
     public IServiceCollection Services { get; } = new ServiceCollection();
 
+    /// <summary>
+    /// Gets or sets services provider.
+    /// </summary>
     public IServiceProvider ServicesProvider =>
         _serviceProvider ?? throw new InvalidOperationException("Host has not been initialized. Call Initialize() first.");
 
+    /// <summary>
+    /// Gets or sets faker.
+    /// </summary>
     public Faker Faker => _faker.Value;
 
+    /// <summary>
+    /// Gets or sets auto faker.
+    /// </summary>
     public AutoFaker AutoFaker => _autoFaker.Value;
 
     public UnitTestHost()
@@ -53,6 +65,10 @@ public class UnitTestHost : IUnitTestHost
         _initializer = new AsyncInitializer(BuildServices);
     }
 
+    /// <summary>
+    /// Initializes async.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public virtual async Task InitializeAsync()
     {
         await _initializer.Init().NoSync();
@@ -86,6 +102,10 @@ public class UnitTestHost : IUnitTestHost
             Services.AddSingleton(typeof(ILogger<>), typeof(Logger<>));
     }
 
+    /// <summary>
+    /// Asynchronously releases resources used by the current instance.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public virtual async ValueTask DisposeAsync()
     {
         if (!_disposed.TrySetTrue())
