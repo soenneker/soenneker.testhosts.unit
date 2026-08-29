@@ -17,7 +17,7 @@ using Soenneker.Extensions.ValueTask;
 
 namespace Soenneker.TestHosts.Unit;
 
-///<inheritdoc cref="IUnitTestHost"/>
+/// <inheritdoc cref="IUnitTestHost"/>
 public class UnitTestHost : IUnitTestHost
 {
     private ServiceProvider? _serviceProvider;
