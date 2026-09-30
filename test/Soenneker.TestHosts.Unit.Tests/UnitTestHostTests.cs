@@ -13,7 +13,7 @@ public sealed class UnitTestHostTests
     }
 
     [Test]
-    public async Task Initialize_registers_fallback_logging_services()
+    public async ValueTask Initialize_registers_fallback_logging_services()
     {
         await using var host = new UnitTestHost();
 
@@ -25,7 +25,7 @@ public sealed class UnitTestHostTests
     }
 
     [Test]
-    public async Task Initialize_supports_consumer_added_logging_pipeline()
+    public async ValueTask Initialize_supports_consumer_added_logging_pipeline()
     {
         await using var host = new UnitTestHost();
 
@@ -41,7 +41,7 @@ public sealed class UnitTestHostTests
     }
 
     [Test]
-    public async Task Initialize_is_safe_to_call_multiple_times()
+    public async ValueTask Initialize_is_safe_to_call_multiple_times()
     {
         await using var host = new UnitTestHost();
 
