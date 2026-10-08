@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Serilog;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace Soenneker.TestHosts.Unit.Tests;
 
@@ -13,7 +14,7 @@ public sealed class UnitTestHostTests
     }
 
     [Test]
-    public async ValueTask Initialize_registers_fallback_logging_services()
+    public async ValueTask Initialize_registers_fallback_logging_services(CancellationToken cancellationToken)
     {
         await using var host = new UnitTestHost();
 
@@ -25,7 +26,7 @@ public sealed class UnitTestHostTests
     }
 
     [Test]
-    public async ValueTask Initialize_supports_consumer_added_logging_pipeline()
+    public async ValueTask Initialize_supports_consumer_added_logging_pipeline(CancellationToken cancellationToken)
     {
         await using var host = new UnitTestHost();
 
@@ -41,7 +42,7 @@ public sealed class UnitTestHostTests
     }
 
     [Test]
-    public async ValueTask Initialize_is_safe_to_call_multiple_times()
+    public async ValueTask Initialize_is_safe_to_call_multiple_times(CancellationToken cancellationToken)
     {
         await using var host = new UnitTestHost();
 
