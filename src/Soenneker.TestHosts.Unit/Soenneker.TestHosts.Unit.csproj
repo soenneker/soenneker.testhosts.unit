@@ -43,7 +43,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Soenneker.Asyncs.Initializers" Version="11.0.139" />
+        <PackageReference Include="Soenneker.Asyncs.Initializers" Version="11.0.140" />
 <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
 <PackageReference Include="Soenneker.Serilog.Sinks.TUnit" Version="11.0.168" />
         <PackageReference Include="Soenneker.Utils.AutoBogus" Version="11.0.1010" />
